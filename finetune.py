@@ -98,7 +98,7 @@ class CollateFn:
             target,
             padding="max_length",
             truncation=True,
-            max_length=64,
+            max_length=5,
             return_tensors="pt",
         )
         return inputs, gold, target
