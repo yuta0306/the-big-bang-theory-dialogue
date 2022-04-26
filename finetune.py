@@ -172,9 +172,10 @@ if __name__ == "__main__":
         collate_fn=CollateFn(tokenizer=tokenizer),
     )
     with torch.no_grad():
-        for inputs, gold in dataloader:
+        for inputs, gold, target in dataloader:
             outputs = model.generate(
                 input_ids=inputs["input_ids"].to(device),
+                decoder_input_ids=target.input_ids.to(device),
                 attention_mask=inputs["attention_mask"].to(device),
                 do_sample=False,
             )
