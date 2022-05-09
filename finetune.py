@@ -2,6 +2,7 @@ import argparse
 import json
 import re
 from random import random
+from urllib import response
 
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -151,6 +152,61 @@ if __name__ == "__main__":
             loss_total += loss
             loss.backward()
             optimizer.step()
+        # loss_total /= i
+
+        # Valid with testset
+        tokenizer_test = T5Tokenizer.from_pretrained(args.model_name)
+        tokenizer_test.padding_side = "left"
+        tokenizer_test.pad_token = tokenizer_test.eos_token
+        dataloader = DataLoader(
+            test_dataset,
+            batch_size=1,
+            shuffle=False,
+            collate_fn=CollateFn(tokenizer=tokenizer_test),
+        )
+        with torch.no_grad():
+            for i, (inputs, gold, target) in enumerate(dataloader):
+                outputs = model(
+                    input_ids=inputs.input_ids.to(device),
+                    # decoder_input_ids=target.input_ids.to(device),
+                    labels=gold.input_ids.to(device),
+                )
+                loss_total += outputs.loss
+                if random() > 0.8:
+                    response = model.generate(
+                        input_ids=inputs["input_ids"].to(device),
+                        decoder_input_ids=target.input_ids.to(device),
+                        attention_mask=inputs["attention_mask"].to(device),
+                        do_sample=False,
+                    )
+
+                    print("=" * 20)
+                    print(
+                        "INPUT:",
+                        tokenizer.decode(
+                            inputs["input_ids"][0],
+                            skip_special_tokens=True,
+                            do_sample=False,
+                        ),
+                    )
+                    print(
+                        "PREDICT:",
+                        tokenizer.decode(
+                            response.detach()[0],
+                            skip_special_tokens=True,
+                            do_sample=False,
+                        ),
+                    )
+                    print(
+                        "GOLD:",
+                        tokenizer.decode(
+                            gold["input_ids"][0],
+                            skip_special_tokens=True,
+                            do_sample=False,
+                        ),
+                    )
+                    print("=" * 20)
+
         loss_total /= i
         print(f"Loss on Epoch {e}:", loss_total)
         patience -= 1
@@ -161,49 +217,3 @@ if __name__ == "__main__":
             patience = 3
         if patience <= 0:
             break
-
-    # Inference
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
-    tokenizer.padding_side = "left"
-    tokenizer.pad_token = tokenizer.eos_token
-    dataloader = DataLoader(
-        test_dataset,
-        batch_size=1,
-        shuffle=False,
-        collate_fn=CollateFn(tokenizer=tokenizer),
-    )
-    with torch.no_grad():
-        for inputs, gold, target in dataloader:
-            outputs = model.generate(
-                input_ids=inputs["input_ids"].to(device),
-                decoder_input_ids=target.input_ids.to(device),
-                attention_mask=inputs["attention_mask"].to(device),
-                do_sample=False,
-            )
-            if random() > 0.8:
-                print("=" * 20)
-                print(
-                    "INPUT:",
-                    tokenizer.decode(
-                        inputs["input_ids"][0],
-                        skip_special_tokens=True,
-                        do_sample=False,
-                    ),
-                )
-                print(
-                    "PREDICT:",
-                    tokenizer.decode(
-                        outputs.detach()[0],
-                        skip_special_tokens=True,
-                        do_sample=False,
-                    ),
-                )
-                print(
-                    "GOLD:",
-                    tokenizer.decode(
-                        gold["input_ids"][0],
-                        skip_special_tokens=True,
-                        do_sample=False,
-                    ),
-                )
-                print("=" * 20)
