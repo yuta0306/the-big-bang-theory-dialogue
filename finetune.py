@@ -105,15 +105,34 @@ class CollateFn:
 
 
 if __name__ == "__main__":
+    from collections import Counter
+
     # prepare dataset
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt", type=str, default="./best.ckpt")
     parser.add_argument("--model_name", type=str, default="t5-base")
+    parser.add_argument(
+        "--tokenizer_path", type=str, default="the-big-bang-theory-dialogue"
+    )
+    parser.add_argument("--add_tokens", type=bool, default=False)
     args = parser.parse_args()
 
     data = load_json("data.json")
     data = preprocess(data=data)
     train_data, test_data = split_data(data=data)
+
+    if args.add_tokens:
+        new_vocab = []
+        for episode in data:
+            for vocab, _ in episode["scripts"]:
+                new_vocab.append(vocab)
+        counter = Counter(new_vocab)
+        vocab = set()
+        for key, value in counter.items():
+            if value > 10:
+                vocab.add(key)
+
+        print("New vocab:", vocab)
 
     train_dataset = TheBigBangTheoryDataset(data=train_data)
     # print(train_dataset[0])
@@ -122,7 +141,19 @@ if __name__ == "__main__":
 
     # Train
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
+    if args.add_tokens:
+        tokenizer = T5Tokenizer.from_pretrained(args.model_name)
+        print("Before Resize Vocab:", len(tokenizer))
+        print("Size Vocab:", len(vocab))
+        tokenizer.add_tokens(list(vocab))
+        print("After Resize Vocab:", len(tokenizer))
+        print("=" * 30)
+        print(dir(tokenizer))
+        tokenizer.save_pretrained("the-big-bang-theory-vocab.json")
+        print("Save tokenizer!")
+    else:
+        tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path)
+
     dataloader = DataLoader(
         train_dataset,
         batch_size=16,
@@ -133,6 +164,8 @@ if __name__ == "__main__":
         args.model_name,
         max_length=64,
     ).to(device)
+    model.resize_token_embeddings(len(tokenizer))
+
     # criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-5)
     epoch = 35
