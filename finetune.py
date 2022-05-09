@@ -59,8 +59,8 @@ class TheBigBangTheoryDataset(Dataset):
                 text = ""
                 for uttr in scripts[max(idx - 7, 0) : idx]:
                     text += ": ".join(uttr)
-                target = scripts[idx][0] + ":"
-                gold = scripts[idx][1]
+                target = scripts[idx][0] + ":"  # this is a chatee
+                gold = scripts[idx][0] + ":" + scripts[idx][1]
                 corpus.append([text, gold, target])
         self.data = corpus
 
@@ -108,6 +108,7 @@ if __name__ == "__main__":
     # prepare dataset
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt", type=str, default="./best.ckpt")
+    parser.add_argument("--model_name", type=str, default="t5-base")
     args = parser.parse_args()
 
     data = load_json("data.json")
@@ -121,7 +122,7 @@ if __name__ == "__main__":
 
     # Train
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    tokenizer = T5Tokenizer.from_pretrained("t5-small")
+    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
     dataloader = DataLoader(
         train_dataset,
         batch_size=16,
@@ -129,7 +130,7 @@ if __name__ == "__main__":
         collate_fn=CollateFn(tokenizer=tokenizer),
     )
     model: T5ForConditionalGeneration = T5ForConditionalGeneration.from_pretrained(
-        "t5-small",
+        "t5-base",
         max_length=64,
     ).to(device)
     # criterion = torch.nn.CrossEntropyLoss()
@@ -143,7 +144,7 @@ if __name__ == "__main__":
         for i, (inputs, gold, target) in enumerate(tqdm(dataloader), 1):
             outputs = model(
                 input_ids=inputs.input_ids.to(device),
-                decoder_input_ids=target.input_ids.to(device),
+                # decoder_input_ids=target.input_ids.to(device),
                 labels=gold.input_ids.to(device),
             )
             loss = outputs.loss
@@ -162,7 +163,7 @@ if __name__ == "__main__":
             break
 
     # Inference
-    tokenizer = T5Tokenizer.from_pretrained("t5-small")
+    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
     tokenizer.padding_side = "left"
     tokenizer.pad_token = tokenizer.eos_token
     dataloader = DataLoader(
