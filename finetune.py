@@ -130,7 +130,7 @@ if __name__ == "__main__":
         collate_fn=CollateFn(tokenizer=tokenizer),
     )
     model: T5ForConditionalGeneration = T5ForConditionalGeneration.from_pretrained(
-        "t5-base",
+        args.model_name,
         max_length=64,
     ).to(device)
     # criterion = torch.nn.CrossEntropyLoss()
