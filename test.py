@@ -22,11 +22,18 @@ def preprocess(data: list):
         scripts = [item for item in scripts if len(item) == 2]
         scripts = [
             [
+                re.sub("’", "'", character).strip(),
+                re.sub("’", "'", utterance).strip(),
+            ]
+            for (character, utterance) in scripts
+        ]  # replace \u2019 to '
+        scripts = [
+            [
                 re.sub(r"\(.*\)", "", character).strip(),
                 re.sub(r"\(.*\)", "", utterance).strip(),
             ]
             for (character, utterance) in scripts
-        ]
+        ]  # delete (sth)
         new_data.append(
             {
                 "title": title,
@@ -108,6 +115,7 @@ if __name__ == "__main__":
     # prepare dataset
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt", type=str, default="./best.ckpt")
+    parser.add_argument("--model_name", type=str, default="t5-base")
     args = parser.parse_args()
 
     data = load_json("data.json")
@@ -123,14 +131,14 @@ if __name__ == "__main__":
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     model: T5ForConditionalGeneration = T5ForConditionalGeneration.from_pretrained(
-        "t5-small",
+        args.model_name,
         max_length=64,
     )
     model.load_state_dict(torch.load(args.ckpt, map_location=device))
     model.to(device)
 
     # Inference
-    tokenizer = T5Tokenizer.from_pretrained("t5-small")
+    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
     tokenizer.padding_side = "left"
     tokenizer.pad_token = tokenizer.eos_token
     dataloader = DataLoader(
