@@ -147,7 +147,7 @@ if __name__ == "__main__":
         tokenizer.add_tokens(list(vocab))
         print("After Resize Vocab:", len(tokenizer))
         print("=" * 30)
-        tokenizer.save_pretrained("the-big-bang-theory-vocab.json")
+        tokenizer.save_pretrained(args.tokenizer_path)
         print("Save tokenizer!")
     else:
         tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path)
