@@ -60,7 +60,7 @@ class TheBigBangTheoryDataset(Dataset):
                 for uttr in scripts[max(idx - 7, 0) : idx]:
                     text += ": ".join(uttr)
                 target = scripts[idx][0] + ":"  # this is a chatee
-                gold = scripts[idx][0] + ":" + scripts[idx][1]
+                gold = scripts[idx][0] + ": " + scripts[idx][1]
                 corpus.append([text, gold, target])
         self.data = corpus
 
@@ -105,8 +105,6 @@ class CollateFn:
 
 
 if __name__ == "__main__":
-    from collections import Counter
-
     # prepare dataset
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt", type=str, default="./best.ckpt")
@@ -126,11 +124,12 @@ if __name__ == "__main__":
         for episode in data:
             for vocab, _ in episode["scripts"]:
                 new_vocab.append(vocab)
-        counter = Counter(new_vocab)
-        vocab = set()
-        for key, value in counter.items():
-            if value > 10:
-                vocab.add(key)
+        # counter = Counter(new_vocab)
+        # vocab = set()
+        # for key, value in counter.items():
+        #     if value > 10:
+        #         vocab.add(key)
+        vocab = list(set(new_vocab))
 
         print("New vocab:", vocab)
 
@@ -148,11 +147,11 @@ if __name__ == "__main__":
         tokenizer.add_tokens(list(vocab))
         print("After Resize Vocab:", len(tokenizer))
         print("=" * 30)
-        print(dir(tokenizer))
         tokenizer.save_pretrained("the-big-bang-theory-vocab.json")
         print("Save tokenizer!")
     else:
         tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path)
+        print("Vocab size:", len(tokenizer))
 
     dataloader = DataLoader(
         train_dataset,
@@ -168,7 +167,7 @@ if __name__ == "__main__":
 
     # criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-5)
-    epoch = 35
+    epoch = 7
     patience = 3
     best_loss = 1e10
     for e in range(epoch):
@@ -177,7 +176,9 @@ if __name__ == "__main__":
         for i, (inputs, gold, target) in enumerate(tqdm(dataloader), 1):
             outputs = model(
                 input_ids=inputs.input_ids.to(device),
+                attention_mask=inputs.attention_mask.to(device),
                 # decoder_input_ids=target.input_ids.to(device),
+                # decoder_attention_mask=target.attention_mask.to(device),
                 labels=gold.input_ids.to(device),
             )
             loss = outputs.loss
@@ -196,7 +197,6 @@ if __name__ == "__main__":
             break
 
     # Inference
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
     tokenizer.padding_side = "left"
     tokenizer.pad_token = tokenizer.eos_token
     dataloader = DataLoader(
@@ -208,9 +208,10 @@ if __name__ == "__main__":
     with torch.no_grad():
         for inputs, gold, target in dataloader:
             outputs = model.generate(
-                input_ids=inputs["input_ids"].to(device),
+                input_ids=inputs.input_ids.to(device),
+                attention_mask=inputs.attention_mask.to(device),
                 decoder_input_ids=target.input_ids.to(device),
-                attention_mask=inputs["attention_mask"].to(device),
+                decoder_attention_mask=target.attention_mask.to(device),
                 do_sample=False,
             )
             if random() > 0.8:

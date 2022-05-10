@@ -66,8 +66,8 @@ class TheBigBangTheoryDataset(Dataset):
                 text = ""
                 for uttr in scripts[max(idx - 7, 0) : idx]:
                     text += ": ".join(uttr)
-                target = scripts[idx][0] + ":"
-                gold = scripts[idx][1]
+                target = scripts[idx][0] + ":"  # this is a chatee
+                gold = scripts[idx][0] + ": " + scripts[idx][1]
                 corpus.append([text, gold, target])
         self.data = corpus
 
@@ -116,6 +116,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt", type=str, default="./best.ckpt")
     parser.add_argument("--model_name", type=str, default="t5-base")
+    parser.add_argument("--tokenizer_path", type=str, default=None)
     args = parser.parse_args()
 
     data = load_json("data.json")
@@ -130,17 +131,21 @@ if __name__ == "__main__":
     # Train
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
+    # Inference
+    if args.tokenizer_path is None:
+        tokenizer = T5Tokenizer.from_pretrained(args.model_name)
+    else:
+        tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path)
+    tokenizer.padding_side = "left"
+    tokenizer.pad_token = tokenizer.eos_token
+
     model: T5ForConditionalGeneration = T5ForConditionalGeneration.from_pretrained(
         args.model_name,
         max_length=64,
-    )
-    model.load_state_dict(torch.load(args.ckpt, map_location=device))
-    model.to(device)
+    ).to(device)
+    model.resize_token_embeddings(len(tokenizer))
+    model = model.load_state_dict(torch.load(args.ckpt, map_location=device))
 
-    # Inference
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
-    tokenizer.padding_side = "left"
-    tokenizer.pad_token = tokenizer.eos_token
     dataloader = DataLoader(
         test_dataset,
         batch_size=1,
@@ -149,13 +154,13 @@ if __name__ == "__main__":
     )
     with torch.no_grad():
         for inputs, gold, target in dataloader:
-            outputs = model.generate(
-                input_ids=inputs["input_ids"].to(device),
-                decoder_input_ids=target.input_ids.to(device),
-                attention_mask=inputs["attention_mask"].to(device),
-                do_sample=False,
-            )
             if random() > 0.8:
+                outputs = model.generate(
+                    input_ids=inputs["input_ids"].to(device),
+                    decoder_input_ids=target.input_ids.to(device),
+                    attention_mask=inputs["attention_mask"].to(device),
+                    do_sample=False,
+                )
                 print("=" * 20)
                 print(
                     "INPUT:",
