@@ -166,8 +166,8 @@ if __name__ == "__main__":
     model.resize_token_embeddings(len(tokenizer))
 
     # criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-5)
-    epoch = 7
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-7)
+    epoch = 15
     patience = 3
     best_loss = 1e10
     for e in range(epoch):
